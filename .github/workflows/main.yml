@@ -58,7 +58,7 @@ jobs:
           chmod 600 private_key
           
           # ビルドしたファイルをEC2にrsyncでコピー
-          rsync -avz --delete -e "ssh -i private_key -o StrictHostKeyChecking=no" build/ ${{ secrets.EC2_USER_NAME }}@${{ secrets.EC2_HOST_NAME }}:/usr/share/nginx/html/
+          sudo rsync -avz --delete -e "ssh -i private_key -o StrictHostKeyChecking=no" build/ ${{ secrets.EC2_USER_NAME }}@${{ secrets.EC2_HOST_NAME }}:/usr/share/nginx/html/
           
           # SSH接続して、Nginxを再起動
           ssh -i private_key -o StrictHostKeyChecking=no ${{ secrets.EC2_USER_NAME }}@${{ secrets.EC2_HOST_NAME }} "sudo systemctl restart nginx"
