@@ -46,22 +46,37 @@ jobs:
       # Reactアプリのビルド
       - name: Build React app
         run: npm run build
-
-      # デプロイする
-      - name: Deploy
+      # SSHのセキュリティグループを開放する
+      - name: Open SSH port
         run: |
-          # SSHのセキュリティグループを開放する
           aws ec2 authorize-security-group-ingress --group-id ${{ secrets.EC2_SECURITY_GROUP_ID }} --protocol tcp --port 22 --cidr ${{ steps.ip.outputs.ipv4 }}/32
-          
-          # SSH秘密鍵の設定
+      
+      # SSH秘密鍵の設定
+      - name: Set up SSH key
+        run: |
           echo "${{ secrets.GIT_PRIVATE_KEY }}" > private_key
           chmod 600 private_key
-          
-          # ビルドしたファイルをEC2にrsyncでコピー
+      
+      # EC2インスタンスの権限を修正
+      - name: Fix permissions on EC2
+        run: |
+          ssh -i private_key -o StrictHostKeyChecking=no ${{ secrets.EC2_USER_NAME }}@${{ secrets.EC2_HOST_NAME }} "
+            sudo chown -R ${{ secrets.EC2_USER_NAME }}:${{ secrets.EC2_USER_NAME }} /usr/share/nginx/html &&
+            sudo chmod -R 755 /usr/share/nginx/html &&
+            sudo systemctl restart nginx
+          "
+      
+      # ビルドしたファイルをEC2にrsyncでコピー
+      - name: Copy files to EC2
+        run: |
           sudo rsync -avz --delete -e "ssh -i private_key -o StrictHostKeyChecking=no" build/ ${{ secrets.EC2_USER_NAME }}@${{ secrets.EC2_HOST_NAME }}:/usr/share/nginx/html/
-          
-          # SSH接続して、Nginxを再起動
+      
+      # SSH接続して、Nginxを再起動
+      - name: Restart Nginx
+        run: |
           ssh -i private_key -o StrictHostKeyChecking=no ${{ secrets.EC2_USER_NAME }}@${{ secrets.EC2_HOST_NAME }} "sudo systemctl restart nginx"
-          
-          # SSHのセキュリティグループを閉じる
+      
+      # SSHのセキュリティグループを閉じる
+      - name: Close SSH port
+        run: |
           aws ec2 revoke-security-group-ingress --group-id ${{ secrets.EC2_SECURITY_GROUP_ID }} --protocol tcp --port 22 --cidr ${{ steps.ip.outputs.ipv4 }}/32
